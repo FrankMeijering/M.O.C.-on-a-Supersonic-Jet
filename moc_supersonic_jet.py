@@ -140,28 +140,15 @@ def intersect(A, B, C, D):
     return np.logical_and(ccw(A, C, D) != ccw(B, C, D), ccw(A, B, C) != ccw(A, B, D))
 
 
+# ---------------------------------- USER DEFINED PARAMETERS -----------------------------------
 # Initial conditions and constants
 gamma = 1.4
 p_a = 1  # [atm]
 M_1 = 2
-nu_1 = m_to_nu(gamma, M_1)
 p_1 = 2*p_a
-phi_1 = 0  # radians
-mu_1 = np.arcsin(1/M_1)
-
-# Values after the first expansion fan
-# NOTE: M_jetboundary, nu_jetboundary = M_2, nu_2 over the entire flow
-p_0 = p_1*(1+((gamma-1)/2)*M_1**2)**(gamma/(gamma-1))  # Total pressure is constant, because of isentropic flow
-p_2 = p_a
-M_2 = p_to_m_isentropic(gamma, p_2, p_0)
-nu_2 = m_to_nu(gamma, M_2)
-mu_2 = np.arcsin(1/M_2)
-phi_2 = nu_2-nu_1+phi_1
-
-# Geometry
 H = 1  # Height (diameter) of the exit
 
-# Solving the problem
+# Parameters regarding the numerical scheme and plotting
 N_char = 15  # Number of characteristics in which the expansion fan will be divided (at least 3)
 res = 100  # "Resolution" of the straight lines that in itself do not contain data points
 show_char = True  # Whether the characteristics are to be plotted or not
@@ -176,6 +163,22 @@ show_text_regions = False  # Whether the text appears that shows the definition 
 show_text_points1 = False  # Whether the text appears that shows the data structure in non-simple region 1
 show_text_points2 = False  # Whether the text appears that shows the data structure in non-simple region 2
 
+# ------------------------- CALCULATION OF CONSTANT VALUES AND DEFINITION OF EXPANSION FAN ----------------------------
+# Properties of uniform region 1
+phi_1 = 0  # radians
+nu_1 = m_to_nu(gamma, M_1)  # radians
+mu_1 = np.arcsin(1/M_1)
+
+# Properties of uniform region 2 (after expansion fan)
+# NOTE: M_jetboundary, nu_jetboundary = M_2, nu_2 over the entire flow
+p_0 = p_1*(1+((gamma-1)/2)*M_1**2)**(gamma/(gamma-1))  # Total pressure is constant, because of isentropic flow
+p_2 = p_a
+M_2 = p_to_m_isentropic(gamma, p_2, p_0)
+nu_2 = m_to_nu(gamma, M_2)
+mu_2 = np.arcsin(1/M_2)
+phi_2 = nu_2-nu_1+phi_1
+
+# Discretise expansion fan
 fan = np.array([[phi_1, nu_1, M_1, mu_1, p_1, nu_1+phi_1]])  # Structure: [phi, nu, M, mu, p, V-]
 for x in range(N_char)[1:]:  # All characteristics are gamma-
     phi = (phi_2-phi_1)*x/(N_char-1)+phi_1
@@ -186,15 +189,16 @@ for x in range(N_char)[1:]:  # All characteristics are gamma-
     V_minus = nu+phi
     fan = np.vstack((fan, np.array([[phi, nu, M, mu, p, V_minus]])))
 
+# Initialise arrays, for loop, and figure
 points = np.array([[np.nan]*7])  # Dummy to be able to append to. Structure: [phi, nu, M, mu, p, x, y]
 points_char = np.array([[np.nan]*7])  # Dummy, is used to make extra data points for the characteristic lines
 lines_char = np.array([[np.nan]*10])  # Dummy: [phi, nu, M, mu, p, x0, y0, x1,  y1, gamma]. 0 = gamma-, 1 = gamma+
-step = 0  # track time
 fig1 = plt.figure()
 ax1 = fig1.add_subplot()
 
 # -------------------------------- FIRST WAVE INTERACTION ----------------------------------------------
 # i are the incoming gamma- characteristics, j are the outgoing gamma+ characteristics.
+step = 0  # track progress of the for-loop
 for j in range(N_char):
     for i in range(N_char)[j:]:
         # Calculate the properties
